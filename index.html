@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Princess Coin Adventure</title>
+<style>
+html,body{margin:0;overflow:hidden;font-family:Arial;background:#87CEEB}
+#ui{position:absolute;left:10px;top:10px;color:#fff;font-weight:bold;text-shadow:1px 1px 2px #000}
+canvas{display:block}
+</style>
+</head>
+<body>
+<div id="ui">Coins: 0<br>F=Fly(20) J=Jump(10)</div>
+<canvas id="c"></canvas>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();onresize=rs;
+const G=80,grav=.8;
+const p={x:100,y:100,w:40,h:60,vy:0,spd:6,ground:true};
+let score=0,flyEnd=0,jumpEnd=0;
+const ui=document.getElementById('ui');
+const keys={},coins=[];
+function gy(){return cv.height-G;}
+p.y=gy()-p.h;
+addEventListener('keydown',e=>{
+ keys[e.code]=true;
+ if(e.code==='KeyF'&&score>=20){score-=20;flyEnd=Date.now()+5000;}
+ if(e.code==='KeyJ'&&score>=10){score-=10;jumpEnd=Date.now()+10000;}
+ if(e.code==='Space'&&p.ground&&Date.now()>flyEnd){
+  p.vy=Date.now()<jumpEnd?-24:-16;p.ground=false;
+ }
+ updUI();
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+cv.addEventListener('touchstart',()=>{if(p.ground){p.vy=Date.now()<jumpEnd?-24:-16;p.ground=false;}});
+cv.addEventListener('touchmove',e=>{p.x=e.touches[0].clientX-p.w/2;});
+function updUI(){ui.innerHTML=`Coins: ${score}<br>F=Fly(20) J=Jump(10)`;}
+function spawn(){
+ let r=Math.random(),y;
+ if(r<.4)y=gy()-12;
+ else if(r<.75)y=gy()-120-Math.random()*80;
+ else y=gy()-280-Math.random()*140;
+ coins.push({x:Math.random()*(cv.width-30),y,r:10});
+}
+setInterval(()=>{if(coins.length<15)spawn();},600);
+function loop(){
+ if(keys.ArrowLeft)p.x-=p.spd;
+ if(keys.ArrowRight)p.x+=p.spd;
+ if(Date.now()<flyEnd){
+   p.vy=0;
+   if(keys.Space)p.y-=6;
+   if(keys.ShiftLeft||keys.ShiftRight)p.y+=6;
+ }else{
+   p.vy+=grav;p.y+=p.vy;
+ }
+ if(p.y+p.h>=gy()){p.y=gy()-p.h;p.vy=0;p.ground=true;}
+ p.x=Math.max(0,Math.min(cv.width-p.w,p.x));
+ p.y=Math.max(0,p.y);
+ for(let i=coins.length-1;i>=0;i--){
+  let c=coins[i];
+  if(p.x<c.x+c.r&&p.x+p.w>c.x-c.r&&p.y<c.y+c.r&&p.y+p.h>c.y-c.r){
+    coins.splice(i,1);score++;updUI();
+  }
+ }
+ ctx.clearRect(0,0,cv.width,cv.height);
+ ctx.fillStyle="#4caf50";ctx.fillRect(0,gy(),cv.width,G);
+ for(const c of coins){
+  ctx.beginPath();ctx.fillStyle="gold";ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();
+ }
+ // princess
+ ctx.fillStyle="hotpink";ctx.fillRect(p.x,p.y+18,p.w,42);
+ ctx.beginPath();ctx.fillStyle="#ffd7b5";ctx.arc(p.x+20,p.y+10,10,0,Math.PI*2);ctx.fill();
+ ctx.beginPath();ctx.fillStyle="gold";
+ ctx.moveTo(p.x+8,p.y);ctx.lineTo(p.x+15,p.y-8);ctx.lineTo(p.x+20,p.y);
+ ctx.lineTo(p.x+25,p.y-8);ctx.lineTo(p.x+32,p.y);ctx.fill();
+ requestAnimationFrame(loop);
+}
+updUI();loop();
+</script>
+</body>
+</html>
