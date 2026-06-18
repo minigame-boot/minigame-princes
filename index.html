@@ -157,7 +157,7 @@ let flyVy = 0;
 /* mobile swipe */
 let touchStartX = 0;
 let touchStartY = 0;
-let touchMoved = false;
+let touchActive = false;
 
 function gy(){ return cv.height - G; }
 
@@ -190,38 +190,45 @@ cv.addEventListener('touchstart', e => {
   const t = e.touches[0];
   touchStartX = t.clientX;
   touchStartY = t.clientY;
-  touchMoved = false;
-});
+  touchActive = true;
+}, {passive:true});
 
 cv.addEventListener('touchmove', e => {
-  if(gameState !== 'playing') return;
+  if(gameState !== 'playing' || !touchActive) return;
   const t = e.touches[0];
-
-  /* keep x movement */
   p.x = t.clientX - p.w / 2;
+}, {passive:true});
 
-  /* swipe up/down -> Space / LShift */
+cv.addEventListener('touchend', e => {
+  if(gameState !== 'playing' || !touchActive) return;
+
+  const t = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+  if(!t){
+    touchActive = false;
+    return;
+  }
+
+  const dx = t.clientX - touchStartX;
   const dy = t.clientY - touchStartY;
-  if(Math.abs(dy) > 18){
-    touchMoved = true;
 
-    if(dy < -18){
+  if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 18){
+    if(dy < 0){
       /* swipe up = Space */
       if(Date.now() < flyEnd){
         p.y -= 6;
-      }else if(p.ground){
+      }else{
         jump();
       }
-      touchStartY = t.clientY;
-    }else if(dy > 18){
+    }else{
       /* swipe down = LShift */
       if(Date.now() < flyEnd){
         p.y += 6;
       }
-      touchStartY = t.clientY;
     }
   }
-});
+
+  touchActive = false;
+}, {passive:true});
 
 /* POWERUPS */
 function buyFly(){
@@ -417,6 +424,5 @@ function loop(){
 
 loop();
 </script>
-
 </body>
 </html>
