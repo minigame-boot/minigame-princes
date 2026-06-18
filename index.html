@@ -11,6 +11,9 @@ html,body{
   overflow:hidden;
   font-family:Arial;
   background:#87CEEB;
+  overscroll-behavior:none;
+  user-select:none;
+  -webkit-user-select:none;
 }
 
 #ui{
@@ -24,7 +27,10 @@ html,body{
   line-height:1.4;
 }
 
-canvas{display:block}
+canvas{
+  display:block;
+  touch-action:none;
+}
 
 #mobileControls{
   position:fixed;
@@ -154,10 +160,13 @@ let gameEndTime = gameStartTime + GAME_DURATION_MS;
 /* smooth fly motion */
 let flyVy = 0;
 
-/* mobile swipe */
+/* mobile swipe hold state */
+let touchActive = false;
+let touchPointerId = null;
 let touchStartX = 0;
 let touchStartY = 0;
-let touchActive = false;
+let mobileFlyUpHeld = false;
+let mobileFlyDownHeld = false;
 
 function gy(){ return cv.height - G; }
 
@@ -185,50 +194,56 @@ addEventListener('keyup', e => {
   if(e.code === 'Space') spaceLatch = false;
 });
 
-cv.addEventListener('touchstart', e => {
+/* MOBILE: smooth swipe + hold */
+cv.addEventListener('pointerdown', e => {
   if(gameState !== 'playing') return;
-  const t = e.touches[0];
-  touchStartX = t.clientX;
-  touchStartY = t.clientY;
+  if(e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+
   touchActive = true;
-}, {passive:true});
+  touchPointerId = e.pointerId;
+  touchStartX = e.clientX;
+  touchStartY = e.clientY;
+  mobileFlyUpHeld = false;
+  mobileFlyDownHeld = false;
+  cv.setPointerCapture(e.pointerId);
+});
 
-cv.addEventListener('touchmove', e => {
-  if(gameState !== 'playing' || !touchActive) return;
-  const t = e.touches[0];
-  p.x = t.clientX - p.w / 2;
-}, {passive:true});
+cv.addEventListener('pointermove', e => {
+  if(gameState !== 'playing') return;
+  if(!touchActive || e.pointerId !== touchPointerId) return;
 
-cv.addEventListener('touchend', e => {
-  if(gameState !== 'playing' || !touchActive) return;
+  p.x = e.clientX - p.w / 2;
 
-  const t = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
-  if(!t){
-    touchActive = false;
-    return;
-  }
+  const dx = e.clientX - touchStartX;
+  const dy = e.clientY - touchStartY;
 
-  const dx = t.clientX - touchStartX;
-  const dy = t.clientY - touchStartY;
-
-  if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 18){
-    if(dy < 0){
-      /* swipe up = Space */
-      if(Date.now() < flyEnd){
-        p.y -= 6;
+  if(Date.now() < flyEnd){
+    if(Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx)){
+      if(dy < 0){
+        mobileFlyUpHeld = true;
+        mobileFlyDownHeld = false;
       }else{
-        jump();
-      }
-    }else{
-      /* swipe down = LShift */
-      if(Date.now() < flyEnd){
-        p.y += 6;
+        mobileFlyDownHeld = true;
+        mobileFlyUpHeld = false;
       }
     }
   }
+});
 
+function clearTouchState(){
   touchActive = false;
-}, {passive:true});
+  touchPointerId = null;
+  mobileFlyUpHeld = false;
+  mobileFlyDownHeld = false;
+}
+
+cv.addEventListener('pointerup', e => {
+  if(e.pointerId === touchPointerId) clearTouchState();
+});
+
+cv.addEventListener('pointercancel', e => {
+  if(e.pointerId === touchPointerId) clearTouchState();
+});
 
 /* POWERUPS */
 function buyFly(){
@@ -321,6 +336,7 @@ function tryAgain(){
   p.ground = true;
   flyVy = 0;
   spaceLatch = false;
+  clearTouchState();
 
   gameStartTime = Date.now();
   gameEndTime = gameStartTime + GAME_DURATION_MS;
@@ -343,8 +359,8 @@ function loop(){
 
       if(flying){
         const targetFlyVy =
-          (keys['Space'] ? -4 : 0) +
-          (keys['ShiftLeft'] ? 4 : 0);
+          ((keys['Space'] || mobileFlyUpHeld) ? -4 : 0) +
+          ((keys['ShiftLeft'] || mobileFlyDownHeld) ? 4 : 0);
 
         flyVy += (targetFlyVy - flyVy) * 0.18;
         flyVy = Math.max(-5, Math.min(5, flyVy));
