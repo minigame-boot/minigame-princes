@@ -160,7 +160,7 @@ let gameEndTime = gameStartTime + GAME_DURATION_MS;
 /* smooth fly motion */
 let flyVy = 0;
 
-/* mobile swipe hold state */
+/* mobile fly hold state */
 let touchActive = false;
 let touchPointerId = null;
 let touchStartX = 0;
@@ -194,7 +194,7 @@ addEventListener('keyup', e => {
   if(e.code === 'Space') spaceLatch = false;
 });
 
-/* MOBILE: smooth swipe + hold */
+/* mobile: swipe up/down = hold fly up/down */
 cv.addEventListener('pointerdown', e => {
   if(gameState !== 'playing') return;
   if(e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
@@ -205,6 +205,7 @@ cv.addEventListener('pointerdown', e => {
   touchStartY = e.clientY;
   mobileFlyUpHeld = false;
   mobileFlyDownHeld = false;
+
   cv.setPointerCapture(e.pointerId);
 });
 
@@ -217,18 +218,16 @@ cv.addEventListener('pointermove', e => {
   const dx = e.clientX - touchStartX;
   const dy = e.clientY - touchStartY;
 
-  if(Date.now() < flyEnd){
-    if(Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx)){
-      if(dy < 0){
-        mobileFlyUpHeld = true;
-        mobileFlyDownHeld = false;
-      }else{
-        mobileFlyDownHeld = true;
-        mobileFlyUpHeld = false;
-      }
+  if(Date.now() < flyEnd && Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx)){
+    if(dy < 0){
+      mobileFlyUpHeld = true;
+      mobileFlyDownHeld = false;
+    }else{
+      mobileFlyDownHeld = true;
+      mobileFlyUpHeld = false;
     }
   }
-});
+}, {passive:true});
 
 function clearTouchState(){
   touchActive = false;
@@ -359,11 +358,11 @@ function loop(){
 
       if(flying){
         const targetFlyVy =
-          ((keys['Space'] || mobileFlyUpHeld) ? -4 : 0) +
-          ((keys['ShiftLeft'] || mobileFlyDownHeld) ? 4 : 0);
+          ((keys['Space'] || mobileFlyUpHeld) ? -2.5 : 0) +
+          ((keys['ShiftLeft'] || mobileFlyDownHeld) ? 2.5 : 0);
 
-        flyVy += (targetFlyVy - flyVy) * 0.18;
-        flyVy = Math.max(-5, Math.min(5, flyVy));
+        flyVy += (targetFlyVy - flyVy) * 0.10;
+        flyVy = Math.max(-3.5, Math.min(3.5, flyVy));
         p.y += flyVy;
 
         p.vy = 0;
