@@ -1,83 +1,382 @@
-
 <!DOCTYPE html>
 <html lang="lv">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Princess Coin Adventure</title>
+<title>Princess Coin Adventure FINAL</title>
+
 <style>
-html,body{margin:0;overflow:hidden;font-family:Arial;background:#87CEEB}
-#ui{position:absolute;left:10px;top:10px;color:#fff;font-weight:bold;text-shadow:1px 1px 2px #000}
+html,body{
+  margin:0;
+  overflow:hidden;
+  font-family:Arial;
+  background:#87CEEB;
+}
+
+#ui{
+  position:absolute;
+  left:10px;
+  top:10px;
+  color:white;
+  font-weight:bold;
+  text-shadow:1px 1px 2px black;
+  z-index:10;
+  line-height:1.4;
+}
+
 canvas{display:block}
+
+#mobileControls{
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:10px;
+  z-index:9999;
+}
+
+.btn{
+  padding:14px 18px;
+  background:rgba(0,0,0,0.7);
+  color:white;
+  border:1px solid white;
+  border-radius:10px;
+  font-weight:bold;
+  min-width:120px;
+  touch-action:manipulation;
+}
+
+.btn:disabled{
+  opacity:0.4;
+}
+
+#gameOver{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.65);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:10000;
+}
+
+#gameOverBox{
+  background:rgba(20,20,20,0.95);
+  color:white;
+  padding:24px;
+  border-radius:16px;
+  text-align:center;
+  min-width:280px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.4);
+}
+
+#gameOverBox h1{
+  margin:0 0 10px;
+  font-size:32px;
+}
+
+#gameOverBox p{
+  margin:8px 0;
+  font-size:18px;
+}
 </style>
 </head>
+
 <body>
-<div id="ui">Coins: 0<br>F=Fly(20) J=Jump(10)</div>
+
+<div id="ui"></div>
 <canvas id="c"></canvas>
+
+<div id="mobileControls">
+  <button id="flyBtn" class="btn" onclick="buyFly()">💨 FLY (20)</button>
+  <button id="jumpBtn" class="btn" onclick="buyJump()">🦘 JUMP BOOST (10)</button>
+  <button id="rBtn" class="btn" onclick="buyR()">🪙 SPAWN (5)</button>
+</div>
+
+<div id="gameOver">
+  <div id="gameOverBox">
+    <h1>GAME OVER</h1>
+    <p id="finalScore">Score: 0</p>
+    <p id="finalTime">Time: 10:00</p>
+    <button class="btn" onclick="tryAgain()">TRY AGAIN</button>
+  </div>
+</div>
+
 <script>
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
-function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();onresize=rs;
-const G=80,grav=.8;
-const p={x:100,y:100,w:40,h:60,vy:0,spd:6,ground:true};
-let score=0,flyEnd=0,jumpEnd=0;
-const ui=document.getElementById('ui');
-const keys={},coins=[];
-function gy(){return cv.height-G;}
-p.y=gy()-p.h;
-addEventListener('keydown',e=>{
- keys[e.code]=true;
- if(e.code==='KeyF'&&score>=20){score-=20;flyEnd=Date.now()+5000;}
- if(e.code==='KeyJ'&&score>=10){score-=10;jumpEnd=Date.now()+10000;}
- if(e.code==='Space'&&p.ground&&Date.now()>flyEnd){
-  p.vy=Date.now()<jumpEnd?-24:-16;p.ground=false;
- }
- updUI();
-});
-addEventListener('keyup',e=>keys[e.code]=false);
-cv.addEventListener('touchstart',()=>{if(p.ground){p.vy=Date.now()<jumpEnd?-24:-16;p.ground=false;}});
-cv.addEventListener('touchmove',e=>{p.x=e.touches[0].clientX-p.w/2;});
-function updUI(){ui.innerHTML=`Coins: ${score}<br>F=Fly(20) J=Jump(10)`;}
-function spawn(){
- let r=Math.random(),y;
- if(r<.4)y=gy()-12;
- else if(r<.75)y=gy()-120-Math.random()*80;
- else y=gy()-280-Math.random()*140;
- coins.push({x:Math.random()*(cv.width-30),y,r:10});
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+function rs(){
+  cv.width = innerWidth;
+  cv.height = innerHeight;
 }
-setInterval(()=>{if(coins.length<15)spawn();},600);
-function loop(){
- if(keys.ArrowLeft)p.x-=p.spd;
- if(keys.ArrowRight)p.x+=p.spd;
- if(Date.now()<flyEnd){
-   p.vy=0;
-   if(keys.Space)p.y-=6;
-   if(keys.ShiftLeft||keys.ShiftRight)p.y+=6;
- }else{
-   p.vy+=grav;p.y+=p.vy;
- }
- if(p.y+p.h>=gy()){p.y=gy()-p.h;p.vy=0;p.ground=true;}
- p.x=Math.max(0,Math.min(cv.width-p.w,p.x));
- p.y=Math.max(0,p.y);
- for(let i=coins.length-1;i>=0;i--){
-  let c=coins[i];
-  if(p.x<c.x+c.r&&p.x+p.w>c.x-c.r&&p.y<c.y+c.r&&p.y+p.h>c.y-c.r){
-    coins.splice(i,1);score++;updUI();
+rs();
+onresize = rs;
+
+const G = 80;
+const grav = 0.8;
+
+const p = {
+  x:100, y:100, w:40, h:60,
+  vy:0, spd:6,
+  ground:true
+};
+
+let score = 0;
+
+let flyEnd = 0;
+let jumpBoostEnd = 0;
+let spawnEnd = 0;
+
+const FLY_TIME = 5000;
+const JUMP_TIME = 10000;
+const SPAWN_CD = 5000;
+
+const coins = [];
+const keys = Object.create(null);
+
+const ui = document.getElementById('ui');
+const flyBtn = document.getElementById('flyBtn');
+const jumpBtn = document.getElementById('jumpBtn');
+const rBtn = document.getElementById('rBtn');
+const gameOverEl = document.getElementById('gameOver');
+const finalScoreEl = document.getElementById('finalScore');
+const finalTimeEl = document.getElementById('finalTime');
+
+let spaceLatch = false;
+let gameState = 'playing';
+
+const GAME_DURATION_MS = 10 * 60 * 1000;
+let gameStartTime = Date.now();
+let gameEndTime = gameStartTime + GAME_DURATION_MS;
+
+/* smooth fly motion */
+let flyVy = 0;
+
+function gy(){ return cv.height - G; }
+
+p.y = gy() - p.h;
+
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+
+  if(gameState !== 'playing') return;
+
+  if(e.code === 'KeyF') buyFly();
+  if(e.code === 'KeyJ') buyJump();
+  if(e.code === 'KeyR') buyR();
+
+  if(e.code === 'Space' && !spaceLatch){
+    spaceLatch = true;
+    if(Date.now() >= flyEnd){
+      jump();
+    }
   }
- }
- ctx.clearRect(0,0,cv.width,cv.height);
- ctx.fillStyle="#4caf50";ctx.fillRect(0,gy(),cv.width,G);
- for(const c of coins){
-  ctx.beginPath();ctx.fillStyle="gold";ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();
- }
- // princess
- ctx.fillStyle="hotpink";ctx.fillRect(p.x,p.y+18,p.w,42);
- ctx.beginPath();ctx.fillStyle="#ffd7b5";ctx.arc(p.x+20,p.y+10,10,0,Math.PI*2);ctx.fill();
- ctx.beginPath();ctx.fillStyle="gold";
- ctx.moveTo(p.x+8,p.y);ctx.lineTo(p.x+15,p.y-8);ctx.lineTo(p.x+20,p.y);
- ctx.lineTo(p.x+25,p.y-8);ctx.lineTo(p.x+32,p.y);ctx.fill();
- requestAnimationFrame(loop);
+});
+
+addEventListener('keyup', e => {
+  keys[e.code] = false;
+  if(e.code === 'Space') spaceLatch = false;
+});
+
+cv.addEventListener('touchmove', e => {
+  if(gameState !== 'playing') return;
+  p.x = e.touches[0].clientX - p.w / 2;
+});
+
+function buyFly(){
+  if(gameState !== 'playing') return;
+  const now = Date.now();
+  if(score < 20 || now < flyEnd) return;
+  score -= 20;
+  flyEnd = now + FLY_TIME;
+  flyVy = 0;
 }
-updUI();loop();
+
+function buyJump(){
+  if(gameState !== 'playing') return;
+  const now = Date.now();
+  if(score < 10 || now < jumpBoostEnd) return;
+  score -= 10;
+  jumpBoostEnd = now + JUMP_TIME;
+}
+
+function buyR(){
+  if(gameState !== 'playing') return;
+  const now = Date.now();
+  if(score < 5 || now < spawnEnd) return;
+
+  score -= 5;
+  spawnEnd = now + SPAWN_CD;
+
+  for(let i=0;i<12;i++){
+    spawnCoin();
+  }
+}
+
+function jump(){
+  if(!p.ground) return;
+
+  const now = Date.now();
+  const base = -6;
+  const boost = now < jumpBoostEnd ? -10 : 0;
+
+  p.vy = base + boost;
+  p.ground = false;
+}
+
+function spawnCoin(){
+  const groundY = gy();
+  const safeTop = 60;
+  const safeBottom = Math.max(safeTop + 20, groundY - 20);
+
+  const y = Math.random() < 0.5
+    ? groundY - 20
+    : safeTop + Math.random() * (safeBottom - safeTop);
+
+  coins.push({
+    x: Math.random() * (cv.width - 40) + 20,
+    y: y,
+    r: 10
+  });
+}
+
+setInterval(() => {
+  if(gameState !== 'playing') return;
+  for(let i=0;i<4;i++) spawnCoin();
+}, 1000);
+
+function formatTime(ms){
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const min = String(Math.floor(total / 60)).padStart(2, '0');
+  const sec = String(total % 60).padStart(2, '0');
+  return `${min}:${sec}`;
+}
+
+function endGame(){
+  gameState = 'gameover';
+  finalScoreEl.textContent = `Score: ${score}`;
+  finalTimeEl.textContent = `Time: 10:00`;
+  gameOverEl.style.display = 'flex';
+}
+
+function tryAgain(){
+  score = 0;
+  flyEnd = 0;
+  jumpBoostEnd = 0;
+  spawnEnd = 0;
+  coins.length = 0;
+  p.x = 100;
+  p.y = gy() - p.h;
+  p.vy = 0;
+  p.ground = true;
+  flyVy = 0;
+  spaceLatch = false;
+
+  gameStartTime = Date.now();
+  gameEndTime = gameStartTime + GAME_DURATION_MS;
+
+  gameState = 'playing';
+  gameOverEl.style.display = 'none';
+}
+
+function loop(){
+  const now = Date.now();
+
+  if(gameState === 'playing'){
+    const flying = now < flyEnd;
+
+    if(now >= gameEndTime){
+      endGame();
+    }else{
+      if(keys['ArrowLeft']) p.x -= p.spd;
+      if(keys['ArrowRight']) p.x += p.spd;
+
+      if(flying){
+        /* smooth fly up/down */
+        const targetFlyVy =
+          (keys['Space'] ? -4 : 0) +
+          (keys['ShiftLeft'] ? 4 : 0);
+
+        flyVy += (targetFlyVy - flyVy) * 0.18;
+        flyVy = Math.max(-5, Math.min(5, flyVy));
+        p.y += flyVy;
+
+        p.vy = 0;
+      }else{
+        flyVy = 0;
+        p.vy += grav;
+        p.y += p.vy;
+      }
+
+      if(p.y + p.h >= gy()){
+        p.y = gy() - p.h;
+        p.vy = 0;
+        p.ground = true;
+      }
+
+      p.x = Math.max(0, Math.min(cv.width - p.w, p.x));
+      p.y = Math.max(0, Math.min(cv.height - p.h, p.y));
+
+      for(let i=coins.length-1;i>=0;i--){
+        const c = coins[i];
+        if(
+          p.x < c.x + c.r &&
+          p.x + p.w > c.x - c.r &&
+          p.y < c.y + c.r &&
+          p.y + p.h > c.y - c.r
+        ){
+          coins.splice(i,1);
+          score++;
+        }
+      }
+    }
+  }
+
+  ctx.clearRect(0,0,cv.width,cv.height);
+
+  ctx.fillStyle = '#4caf50';
+  ctx.fillRect(0, gy(), cv.width, G);
+
+  for(const c of coins){
+    ctx.beginPath();
+    ctx.fillStyle = 'gold';
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = 'hotpink';
+  ctx.fillRect(p.x, p.y + 20, p.w, 40);
+
+  ctx.beginPath();
+  ctx.fillStyle = '#ffd7b5';
+  ctx.arc(p.x + 20, p.y + 10, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  const timeLeft = gameState === 'playing' ? (gameEndTime - now) : 0;
+  ui.innerHTML =
+    `Coins: ${score}<br>` +
+    `Time: ${formatTime(timeLeft)}<br>` +
+    `F=Fly | J=Jump Boost | R=Spawn | Space=Jump/FlyUp | Shift=FlyDown | Arrows=Move`;
+
+  const flyLeft = Math.max(0, Math.ceil((flyEnd - now) / 1000));
+  const jumpLeft = Math.max(0, Math.ceil((jumpBoostEnd - now) / 1000));
+  const spawnLeft = Math.max(0, Math.ceil((spawnEnd - now) / 1000));
+
+  flyBtn.disabled = gameState !== 'playing' || now < flyEnd || score < 20;
+  jumpBtn.disabled = gameState !== 'playing' || now < jumpBoostEnd || score < 10;
+  rBtn.disabled = gameState !== 'playing' || now < spawnEnd || score < 5;
+
+  flyBtn.textContent = now < flyEnd ? `💨 FLY (${flyLeft}s)` : `💨 FLY (20)`;
+  jumpBtn.textContent = now < jumpBoostEnd ? `🦘 BOOST (${jumpLeft}s)` : `🦘 JUMP (10)`;
+  rBtn.textContent = now < spawnEnd ? `🪙 SPAWN (${spawnLeft}s)` : `🪙 SPAWN (5)`;
+
+  requestAnimationFrame(loop);
+}
+
+loop();
 </script>
+
 </body>
 </html>
