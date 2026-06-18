@@ -154,6 +154,11 @@ let gameEndTime = gameStartTime + GAME_DURATION_MS;
 /* smooth fly motion */
 let flyVy = 0;
 
+/* mobile swipe */
+let touchStartX = 0;
+let touchStartY = 0;
+let touchMoved = false;
+
 function gy(){ return cv.height - G; }
 
 p.y = gy() - p.h;
@@ -180,11 +185,45 @@ addEventListener('keyup', e => {
   if(e.code === 'Space') spaceLatch = false;
 });
 
-cv.addEventListener('touchmove', e => {
+cv.addEventListener('touchstart', e => {
   if(gameState !== 'playing') return;
-  p.x = e.touches[0].clientX - p.w / 2;
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchMoved = false;
 });
 
+cv.addEventListener('touchmove', e => {
+  if(gameState !== 'playing') return;
+  const t = e.touches[0];
+
+  /* keep x movement */
+  p.x = t.clientX - p.w / 2;
+
+  /* swipe up/down -> Space / LShift */
+  const dy = t.clientY - touchStartY;
+  if(Math.abs(dy) > 18){
+    touchMoved = true;
+
+    if(dy < -18){
+      /* swipe up = Space */
+      if(Date.now() < flyEnd){
+        p.y -= 6;
+      }else if(p.ground){
+        jump();
+      }
+      touchStartY = t.clientY;
+    }else if(dy > 18){
+      /* swipe down = LShift */
+      if(Date.now() < flyEnd){
+        p.y += 6;
+      }
+      touchStartY = t.clientY;
+    }
+  }
+});
+
+/* POWERUPS */
 function buyFly(){
   if(gameState !== 'playing') return;
   const now = Date.now();
@@ -215,6 +254,7 @@ function buyR(){
   }
 }
 
+/* JUMP */
 function jump(){
   if(!p.ground) return;
 
@@ -226,6 +266,7 @@ function jump(){
   p.ground = false;
 }
 
+/* COIN SPAWN */
 function spawnCoin(){
   const groundY = gy();
   const safeTop = 60;
@@ -294,7 +335,6 @@ function loop(){
       if(keys['ArrowRight']) p.x += p.spd;
 
       if(flying){
-        /* smooth fly up/down */
         const targetFlyVy =
           (keys['Space'] ? -4 : 0) +
           (keys['ShiftLeft'] ? 4 : 0);
