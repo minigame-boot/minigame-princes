@@ -154,12 +154,10 @@ let gameEndTime = gameStartTime + GAME_DURATION_MS;
 /* smooth fly motion */
 let flyVy = 0;
 
-/* mobile swipe/hold */
+/* mobile swipe */
 let touchStartX = 0;
 let touchStartY = 0;
 let touchActive = false;
-let mobileFlyUpHeld = false;
-let mobileFlyDownHeld = false;
 
 function gy(){ return cv.height - G; }
 
@@ -193,39 +191,43 @@ cv.addEventListener('touchstart', e => {
   touchStartX = t.clientX;
   touchStartY = t.clientY;
   touchActive = true;
-  mobileFlyUpHeld = false;
-  mobileFlyDownHeld = false;
 }, {passive:true});
 
 cv.addEventListener('touchmove', e => {
   if(gameState !== 'playing' || !touchActive) return;
   const t = e.touches[0];
-
   p.x = t.clientX - p.w / 2;
+}, {passive:true});
 
+cv.addEventListener('touchend', e => {
+  if(gameState !== 'playing' || !touchActive) return;
+
+  const t = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+  if(!t){
+    touchActive = false;
+    return;
+  }
+
+  const dx = t.clientX - touchStartX;
   const dy = t.clientY - touchStartY;
 
-  if(Date.now() < flyEnd){
-    if(dy < -18){
-      mobileFlyUpHeld = true;
-      mobileFlyDownHeld = false;
-    }else if(dy > 18){
-      mobileFlyDownHeld = true;
-      mobileFlyUpHeld = false;
+  if(Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 18){
+    if(dy < 0){
+      /* swipe up = Space */
+      if(Date.now() < flyEnd){
+        p.y -= 6;
+      }else{
+        jump();
+      }
+    }else{
+      /* swipe down = LShift */
+      if(Date.now() < flyEnd){
+        p.y += 6;
+      }
     }
   }
-}, {passive:true});
 
-cv.addEventListener('touchend', () => {
   touchActive = false;
-  mobileFlyUpHeld = false;
-  mobileFlyDownHeld = false;
-}, {passive:true});
-
-cv.addEventListener('touchcancel', () => {
-  touchActive = false;
-  mobileFlyUpHeld = false;
-  mobileFlyDownHeld = false;
 }, {passive:true});
 
 /* POWERUPS */
@@ -319,8 +321,6 @@ function tryAgain(){
   p.ground = true;
   flyVy = 0;
   spaceLatch = false;
-  mobileFlyUpHeld = false;
-  mobileFlyDownHeld = false;
 
   gameStartTime = Date.now();
   gameEndTime = gameStartTime + GAME_DURATION_MS;
@@ -343,8 +343,8 @@ function loop(){
 
       if(flying){
         const targetFlyVy =
-          ((keys['Space'] || mobileFlyUpHeld) ? -4 : 0) +
-          ((keys['ShiftLeft'] || mobileFlyDownHeld) ? 4 : 0);
+          (keys['Space'] ? -4 : 0) +
+          (keys['ShiftLeft'] ? 4 : 0);
 
         flyVy += (targetFlyVy - flyVy) * 0.18;
         flyVy = Math.max(-5, Math.min(5, flyVy));
